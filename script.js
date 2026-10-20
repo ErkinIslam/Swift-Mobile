@@ -77,63 +77,100 @@ const BUSINESS = {
     ? crypto.randomUUID()
     : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
-  // Phones text requests from their messaging app (and we get a copy by email, so a request
-  // still reaches us if they never hit send); computers and tablets email them to us
+  // Requests reach us as a text from the customer's own number, so we can reply in the same thread.
+  // Phones open their messaging app; computers and tablets show a QR code that opens it on their
+  // phone. Either way we also get a copy by email, in case the text is never sent.
   const isPhone = /Android.+Mobile|iPhone|iPod/.test(navigator.userAgent);
 
-  // Validates fields by id (errors live in #<id>-err), then sends the message built by
-  // buildLines(). If it can't be sent, the .form-failed panel offers retry, copy and text.
+  // The QR library is only needed off phones: load it once the page is up
+  if (!isPhone && document.querySelector(".form-qr")) {
+    const lib = document.createElement("script");
+    lib.src = "vendor/qrcode-generator-1.4.4.js";
+    document.body.append(lib);
+  }
+
+  // Draws `text` as a QR code that opens a text to us (SMSTO: is what phone cameras recognize).
+  // False if the library couldn't load (e.g. offline).
+  function drawQr(box, text) {
+    box.replaceChildren();
+    if (typeof window.qrcode !== "function") return false;
+    qrcode.stringToBytes = qrcode.stringToBytesFuncs["UTF-8"];
+    const qr = qrcode(0, "M");
+    qr.addData("SMSTO:" + BUSINESS.phoneE164 + ":" + text, "Byte");
+    qr.make();
+    const n = qr.getModuleCount();
+    const quiet = 4; // blank border scanners need
+    let d = "";
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += "M" + (c + quiet) + "," + (r + quiet) + "h1v1h-1z";
+    }
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    const size = n + quiet * 2;
+    svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+    svg.setAttribute("width", String(size * 4)); // at least 4px per square, so it scans off a screen
+    svg.setAttribute("height", String(size * 4));
+    svg.setAttribute("shape-rendering", "crispEdges");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "QR code: scan it with your phone to text us your request");
+    const bg = document.createElementNS(ns, "rect");
+    bg.setAttribute("width", String(size));
+    bg.setAttribute("height", String(size));
+    bg.setAttribute("fill", "#fff");
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", d);
+    path.setAttribute("fill", "#000");
+    svg.append(bg, path);
+    box.append(svg);
+    return true;
+  }
+
+  // Validates fields by id (errors live in #<id>-err), then hands over the message built by
+  // buildLines(): straight to the messaging app on phones, as a QR code everywhere else.
   function setupRequestForm(form, kind, rules, buildLines) {
-    const panels = {
-      sent: form.querySelector(".form-sent"),
-      sms: form.querySelector(".form-sms"),
-      failed: form.querySelector(".form-failed"),
-    };
-    const showPanel = (name) => {
-      Object.entries(panels).forEach(([key, el]) => { if (el) el.hidden = key !== name; });
-    };
-    const submit = form.querySelector('[type="submit"]');
-    const submitLabel = submit.textContent;
+    const smsPanel = form.querySelector(".form-sms");
+    const qrPanel = form.querySelector(".form-qr");
+    const qrBox = form.querySelector(".form-qr-code");
+    const qrStatus = form.querySelector(".form-qr-status");
     const note = form.querySelector(".form-note");
     if (!isPhone && note) note.textContent = note.dataset.emailNote;
 
     const copyBox = form.querySelector(".form-copy");
     const copyBtn = form.querySelector(".form-copy-btn");
-    const retryBtn = form.querySelector(".form-retry");
-    if (retryBtn) {
-      retryBtn.addEventListener("click", () => {
-        if (form.requestSubmit) form.requestSubmit(); else submit.click();
-      });
-    }
     if (copyBtn && copyBox) {
       copyBtn.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(copyBox.value);
-          copyBtn.textContent = "Copied";
-          setTimeout(() => { copyBtn.textContent = "Copy request"; }, 2500);
+          copyBtn.textContent = "copied";
+          setTimeout(() => { copyBtn.textContent = "copy it"; }, 2500);
         } catch (err) {
-          // No clipboard access: select the text so it can be copied by hand
+          // No clipboard access: show the text, selected, so it can be copied by hand
+          copyBox.closest("details").open = true;
           copyBox.focus();
           copyBox.select();
         }
       });
     }
 
+    // Any change makes it a new request (so its email copy is sent too); resending the same one isn't
     let key = newKey();
-    let sentKey = null; // key of the request that reached us
-    let sending = false;
-
-    // Changing anything after a successful send makes it a new request
+    let emailedKey = null; // key whose email copy has been sent or is on its way
     const onEdit = (e) => {
-      if (sentKey !== key || e.target.name === "website" || e.target.classList.contains("form-copy")) return;
+      if (e.target.name === "website" || e.target.classList.contains("form-copy")) return;
       key = newKey();
-      if (!isPhone) {
-        submit.disabled = false;
-        submit.textContent = "Send updated request";
-      }
     };
     form.addEventListener("input", onEdit);
     form.addEventListener("change", onEdit);
+
+    // Emails us a copy. Resolves to true/false, or null if this request was already sent
+    function emailCopy(payload, keepalive) {
+      if (emailedKey === payload.key) return Promise.resolve(null);
+      emailedKey = payload.key;
+      return sendRequest(payload, keepalive).then((ok) => {
+        if (!ok && emailedKey === payload.key) emailedKey = null; // let a resubmit try again
+        return ok;
+      });
+    }
 
     function validateField(id) {
       const input = document.getElementById(id);
@@ -157,9 +194,8 @@ const BUSINESS = {
       });
     });
 
-    form.addEventListener("submit", async (e) => {
+    form.addEventListener("submit", (e) => {
       e.preventDefault();
-      if (sending) return;
 
       const results = Object.keys(rules).map(validateField);
       if (results.includes(false)) {
@@ -180,6 +216,7 @@ const BUSINESS = {
       const payload = {
         form: kind,
         key: key,
+        channel: "sms", // the email says they were asked to text it
         name: data.get("name"),
         phone: data.get("phone"),
         company: data.get("company") || "",
@@ -189,30 +226,27 @@ const BUSINESS = {
 
       if (isPhone) {
         // Not awaited: the messaging app has to open from this tap
-        sendRequest(Object.assign({ channel: "sms" }, payload), true);
-        sentKey = key;
-        showPanel("sms");
-        panels.sms.focus();
+        emailCopy(payload, true);
+        smsPanel.hidden = false;
+        smsPanel.focus();
         window.location.href = href;
         return;
       }
 
-      sending = true;
-      submit.disabled = true;
-      submit.textContent = "Sending…";
-      const ok = await sendRequest(payload);
-      sending = false;
-      if (ok) {
-        sentKey = key;
-        submit.textContent = "Request sent";
-        showPanel("sent");
-        panels.sent.focus();
-        return;
-      }
-      submit.disabled = false;
-      submit.textContent = submitLabel;
-      showPanel("failed");
-      if (retryBtn) retryBtn.focus();
+      // Without the code (library didn't load), the panel still offers text, copy and call
+      qrPanel.classList.toggle("form-qr-nocode", !drawQr(qrBox, text));
+      qrPanel.hidden = false;
+      qrPanel.focus();
+
+      const sentKey = payload.key;
+      if (emailedKey !== sentKey) qrStatus.textContent = ""; // a new request: old status no longer applies
+      emailCopy(payload).then((ok) => {
+        if (ok === null || key !== sentKey) return; // already reported, or the form changed since
+        qrStatus.textContent = ok
+          ? "We've also received a copy by email."
+          : "We couldn't get our email copy, so please send the text (or call us) to make sure we get your request.";
+        qrStatus.classList.toggle("form-qr-warn", !ok);
+      });
     });
 
     return validateField;

@@ -1,6 +1,8 @@
 // End-to-end tests: real browsers against scripts/dev_server.py (emails go to its outbox).
 const { test, expect } = require("@playwright/test");
 const AxeBuilder = require("@axe-core/playwright").default;
+const jsQR = require("jsqr");
+const { PNG } = require("pngjs");
 
 // A fixed "now" so date rules are predictable: Tuesday 20 Oct 2026, 10:30 AM New York time
 const NOW = new Date("2026-10-20T10:30:00-04:00");
@@ -32,112 +34,145 @@ async function fillBooking(page, overrides = {}) {
   await page.fill("#f-notes", "Gate code 4321");
 }
 
-test.describe("booking form on a computer", () => {
-  test.skip(({ isMobile }) => isMobile, "computers email the request");
+// Reads the QR code on screen the way a phone camera would
+async function scanQr(page, form = "#booking-form") {
+  const png = PNG.sync.read(await page.locator(`${form} .form-qr-code svg`).screenshot());
+  const code = jsQR(new Uint8ClampedArray(png.data), png.width, png.height);
+  return code && code.data;
+}
 
-  test("sends once, then only again after a change", async ({ page, request }) => {
+test.describe("booking form on a computer", () => {
+  test.skip(({ isMobile }) => isMobile, "computers get a QR code");
+
+  test("QR code opens a text with the whole request, and we get an email copy", async ({ page, request }) => {
+    await page.goto("/#book");
+    await fillBooking(page);
+    await page.click('#booking-form [type="submit"]');
+
+    const panel = page.locator("#booking-form .form-qr");
+    await expect(panel).toBeVisible();
+    await expect(panel).toBeFocused();
+    await expect(panel).toContainText("Last step: text us your request from your phone");
+    await expect(page.locator("#booking-form .form-qr-status")).toHaveText("We've also received a copy by email.");
+
+    const scanned = await scanQr(page);
+    const copy = await page.inputValue("#f-copy");
+    expect(scanned).toBe("SMSTO:+13474796149:" + copy);
+    for (const line of ["Booking request - Swift Mobile Auto Care", "Name: Jane Doe", "Phone: (718) 555-1234",
+      "Services: Oil Change", "Vehicle: 2019 Honda CR-V", "When: Wed, Oct 21, any time", "Notes: Gate code 4321"]) {
+      expect(scanned).toContain(line);
+    }
+    await expect(panel.locator(".sms-fallback")).toHaveAttribute("href", /^sms:\+13474796149[?&]body=Booking/);
+
+    const mail = await outbox(request);
+    expect(mail).toHaveLength(1);
+    expect(mail[0].to).toBe("oilchange@swiftmobileautocare.com");
+    expect(mail[0].subject).toBe("Booking request (texting you): Jane Doe");
+    expect(mail[0].text).toContain("If no text arrives, follow up with them.");
+  });
+
+  test("showing the code again doesn't email again; a change does", async ({ page, request }) => {
     await page.goto("/#book");
     await fillBooking(page);
     const submit = page.locator('#booking-form [type="submit"]');
     await submit.click();
-
-    await expect(page.locator("#booking-form .form-sent")).toBeVisible();
-    await expect(page.locator("#booking-form .form-sent")).toBeFocused();
-    await expect(submit).toBeDisabled();
-    await expect(submit).toHaveText("Request sent");
-
-    let mail = await outbox(request);
-    expect(mail).toHaveLength(1);
-    expect(mail[0].subject).toBe("Booking request: Jane Doe");
-    for (const line of ["Name: Jane Doe", "Services: Oil Change", "Estimate: $99 + parts + tax", "Vehicle: 2019 Honda CR-V",
-      "Parked: Driveway", "When: Wed, Oct 21, any time", "Notes: Gate code 4321"]) {
-      expect(mail[0].text).toContain(line);
-    }
-
-    // A correction is a new request
-    await page.fill("#f-notes", "Gate code 1234");
-    await expect(submit).toBeEnabled();
-    await expect(submit).toHaveText("Send updated request");
+    await expect(page.locator("#booking-form .form-qr-status")).toHaveText("We've also received a copy by email.");
     await submit.click();
-    await expect(submit).toHaveText("Request sent");
-    mail = await outbox(request);
-    expect(mail).toHaveLength(2);
-    expect(mail[1].text).toContain("Gate code 1234");
+    await page.waitForTimeout(300);
+    expect(await outbox(request)).toHaveLength(1);
+
+    await page.fill("#f-notes", "Gate code 1234");
+    await submit.click();
+    await expect.poll(async () => (await outbox(request)).length).toBe(2);
+    expect((await outbox(request))[1].text).toContain("Gate code 1234");
+    expect(await scanQr(page)).toContain("Notes: Gate code 1234");
   });
 
-  test("changing a quantity picker after sending also counts as a change", async ({ page, request }) => {
+  test("changing a quantity picker counts as a change", async ({ page, request }) => {
     await page.goto("/#book");
     await fillBooking(page);
     await page.check('input[value="Wiper blade replacement"]');
     const submit = page.locator('#booking-form [type="submit"]');
     await submit.click();
-    await expect(submit).toHaveText("Request sent");
+    await expect(page.locator("#booking-form .form-qr-status")).toHaveText("We've also received a copy by email.");
     await page.selectOption("#f-wiper-qty", "3");
-    await expect(submit).toHaveText("Send updated request");
     await submit.click();
-    await expect(submit).toHaveText("Request sent");
-    const mail = await outbox(request);
-    expect(mail).toHaveLength(2);
-    expect(mail[1].text).toContain("Wiper blade replacement (3 blades (incl. rear))");
+    await expect.poll(async () => (await outbox(request)).length).toBe(2);
+    expect((await outbox(request))[1].text).toContain("Wiper blade replacement (3 blades (incl. rear))");
   });
 
-  test("server error: recovery panel keeps the request, retry works", async ({ page, request }) => {
+  test("email copy fails: the code still works and the visitor is told to send the text", async ({ page, request }) => {
     await page.route("**/api/request", (route) => route.fulfill({ status: 502, contentType: "application/json", body: '{"ok": false}' }));
     await page.goto("/#book");
     await fillBooking(page);
     await page.click('#booking-form [type="submit"]');
+    await expect(page.locator("#booking-form .form-qr-code svg")).toBeVisible();
+    await expect(page.locator("#booking-form .form-qr-status")).toHaveText(/please send the text \(or call us\)/);
+    expect(await scanQr(page)).toContain("Name: Jane Doe");
 
-    const failed = page.locator("#booking-form .form-failed");
-    await expect(failed).toBeVisible();
-    await expect(failed).toContainText("We couldn't send your request.");
-    await expect(page.locator("#booking-form .form-retry")).toBeFocused();
-    await expect(page.locator("#f-copy")).toHaveValue(/Name: Jane Doe[\s\S]*Notes: Gate code 4321/);
-    await expect(failed.locator(".sms-fallback")).toHaveAttribute("href", /^sms:\+13474796149[?&]body=Booking/);
-    await expect(page.locator('#booking-form [type="submit"]')).toBeEnabled();
-    expect(await outbox(request)).toHaveLength(0);
-
+    // Submitting again retries the email
     await page.unroute("**/api/request");
-    await page.click("#booking-form .form-retry");
-    await expect(page.locator("#booking-form .form-sent")).toBeVisible();
-    await expect(failed).toBeHidden();
+    await page.click('#booking-form [type="submit"]');
+    await expect(page.locator("#booking-form .form-qr-status")).toHaveText("We've also received a copy by email.");
     expect(await outbox(request)).toHaveLength(1);
   });
 
-  test("lost reply: retrying the same request doesn't email twice", async ({ page, request }) => {
-    // The server sends the email but the answer never arrives (dropped connection)
+  test("lost reply: trying again doesn't email twice", async ({ page, request }) => {
     let first = true;
     await page.route("**/api/request", async (route) => {
       if (!first) return route.continue();
       first = false;
-      await route.fetch();
-      await route.abort("connectionreset");
+      await route.fetch(); // the server sends the email...
+      await route.abort("connectionreset"); // ...but its answer never arrives
     });
     await page.goto("/#book");
     await fillBooking(page);
     await page.click('#booking-form [type="submit"]');
-    await expect(page.locator("#booking-form .form-failed")).toBeVisible();
-    await page.click("#booking-form .form-retry");
-    await expect(page.locator("#booking-form .form-sent")).toBeVisible();
+    await expect(page.locator("#booking-form .form-qr-status")).toHaveText(/please send the text/);
+    await page.click('#booking-form [type="submit"]');
+    await expect(page.locator("#booking-form .form-qr-status")).toHaveText("We've also received a copy by email.");
     expect(await outbox(request)).toHaveLength(1);
+  });
+
+  test("if the QR library can't load, text, copy and call are still offered", async ({ page, request }) => {
+    await page.route("**/vendor/qrcode-generator-*.js", (route) => route.abort());
+    await page.goto("/#book");
+    await fillBooking(page);
+    await page.click('#booking-form [type="submit"]');
+    const panel = page.locator("#booking-form .form-qr");
+    await expect(panel).toBeVisible();
+    await expect(panel.locator(".form-qr-body")).toBeHidden();
+    await expect(panel.locator(".form-qr-alt")).toBeVisible();
+    await expect(panel.locator(".sms-fallback")).toHaveAttribute("href", /body=Booking/);
+    await expect.poll(async () => (await outbox(request)).length).toBe(1);
   });
 
   test("copy button copies the request", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    await page.route("**/api/request", (route) => route.abort("internetdisconnected"));
     await page.goto("/#book");
     await fillBooking(page);
     await page.click('#booking-form [type="submit"]');
     await page.click("#booking-form .form-copy-btn");
-    await expect(page.locator("#booking-form .form-copy-btn")).toHaveText("Copied");
+    await expect(page.locator("#booking-form .form-copy-btn")).toHaveText("copied");
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("Vehicle: 2019 Honda CR-V");
   });
 
-  test("double click sends one request", async ({ page, request }) => {
+  test("double click: one email", async ({ page, request }) => {
     await page.goto("/#book");
     await fillBooking(page);
     await page.locator('#booking-form [type="submit"]').dblclick();
-    await expect(page.locator("#booking-form .form-sent")).toBeVisible();
+    await expect(page.locator("#booking-form .form-qr-status")).toHaveText("We've also received a copy by email.");
     expect(await outbox(request)).toHaveLength(1);
+  });
+
+  test("the QR panel is accessible", async ({ page }) => {
+    await page.goto("/#book");
+    await fillBooking(page);
+    await page.click('#booking-form [type="submit"]');
+    await expect(page.locator("#booking-form .form-qr-status")).not.toBeEmpty();
+    await page.evaluate(() => document.querySelectorAll(".reveal").forEach((el) => el.classList.add("is-visible")));
+    const axe = await new AxeBuilder({ page }).include("#booking-form").analyze();
+    expect(axe.violations.filter((v) => ["serious", "critical"].includes(v.impact)).map((v) => v.id)).toEqual([]);
   });
 
   test("live estimate", async ({ page }) => {
@@ -172,16 +207,26 @@ test.describe("booking form on a computer", () => {
     await page.fill("#q-address", "1 Depot Rd, Bronx");
     await page.selectOption("#q-count", "6–10");
     await page.click('#fleet-form [type="submit"]');
-    await expect(page.locator("#fleet-form .form-sent")).toBeVisible();
-    const mail = await outbox(request);
-    expect(mail).toHaveLength(1);
-    expect(mail[0].subject).toBe("Fleet quote request: Acme Plumbing (Bob Smith)");
-    expect(mail[0].text).toContain("Vehicles: 6–10");
+    await expect(page.locator("#fleet-form .form-qr")).toContainText("text us your quote request");
+    const scanned = await scanQr(page, "#fleet-form");
+    expect(scanned).toContain("SMSTO:+13474796149:Fleet quote request - Swift Mobile Auto Care\nCompany: Acme Plumbing");
+    expect(scanned).toContain("Vehicles: 6–10"); // non-ASCII survives the QR code
+    await expect.poll(async () => (await outbox(request)).length).toBe(1);
+    const [mail] = await outbox(request);
+    expect(mail.subject).toBe("Fleet quote request (texting you): Acme Plumbing (Bob Smith)");
+  });
+
+  test("wide screens use more of the width", async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto("/");
+    const width = await page.locator(".site-header .header-inner").evaluate((el) => el.getBoundingClientRect().width);
+    expect(width).toBe(1440);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   });
 });
 
 test.describe("booking form on a phone", () => {
-  test.skip(({ isMobile }) => !isMobile, "phones text the request");
+  test.skip(({ isMobile }) => !isMobile, "phones open their messaging app");
 
   test("opens the text and still sends us a copy", async ({ page, request }, testInfo) => {
     await page.goto("/#book");

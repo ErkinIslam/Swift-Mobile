@@ -361,18 +361,10 @@
           </div>
 
           <button type="submit" class="btn btn-accent btn-lg btn-block">Send quote request</button>
-          <p class="form-note" data-email-note="Your request comes straight to us. We'll get back to you with a quote.">Submitting sends us your request and opens your messaging app so you can text it to us too.</p>
+          <p class="form-note" data-email-note="Next, you'll get a code to scan with your phone, so you can text us your quote request.">Submitting opens your messaging app with your quote request written out, ready to send. We also get a copy by email.</p>
           <p class="form-privacy">Privacy: we only use your details to prepare your quote and contact you about it. We never sell or share them.</p>
 
-          <div class="form-success form-sent" role="status" tabindex="-1" hidden>
-            <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
-            <div>
-              <p class="form-success-title">Request sent. Thank you!</p>
-              <p>We'll get back to you soon about your quote. Questions? Call <a href="tel:+13474796149"><span>(347) 479-6149</span></a>.</p>
-            </div>
-          </div>
-
-          <!-- Phones: the request is also texted from the messaging app -->
+          <!-- Phones: the messaging app opens with the request written out -->
           <div class="form-success form-sms" role="status" tabindex="-1" hidden>
             <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
             <div>
@@ -381,20 +373,23 @@
             </div>
           </div>
 
-          <!-- Shown when the request could not be sent (no signal, server problem): nothing typed is lost -->
-          <div class="form-failed" role="alert" hidden>
-            <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-            <div>
-              <p class="form-failed-title">We couldn't send your request.</p>
-              <p>Nothing you typed is lost. Try again, or call us at <a href="tel:+13474796149">(347) 479-6149</a>. You can also copy your request below and text it to us.</p>
-              <div class="form-failed-actions">
-                <button type="button" class="btn btn-accent btn-sm form-retry">Try again</button>
-                <button type="button" class="btn btn-outline btn-sm form-copy-btn">Copy request</button>
-                <a class="btn btn-outline btn-sm sms-fallback" href="sms:+13474796149">Text it to us</a>
-              </div>
-              <label class="form-copy-label" for="q-copy">Your request</label>
-              <textarea class="form-copy" id="q-copy" rows="6" readonly></textarea>
+          <!-- Computers: a QR code opens the request as a text on the visitor's phone (script.js draws it) -->
+          <div class="form-qr" role="region" aria-labelledby="q-qr-title" tabindex="-1" hidden>
+            <p class="form-qr-title" id="q-qr-title">Last step: text us your quote request from your phone</p>
+            <div class="form-qr-body">
+              <div class="form-qr-code"></div>
+              <ol class="form-qr-steps">
+                <li>Point your phone's camera at this code.</li>
+                <li>Tap the message prompt that appears. Your quote request opens in your messaging app, already written out.</li>
+                <li>Hit send. We'll text you back with your quote.</li>
+              </ol>
             </div>
+            <p class="form-qr-status" role="status"></p>
+            <p class="form-qr-alt">Can't scan it? <a class="sms-fallback" href="sms:+13474796149">Text it from this device</a>, <button type="button" class="link-button form-copy-btn">copy it</button>, or call <a href="tel:+13474796149">(347) 479-6149</a>.</p>
+            <details class="form-qr-details">
+              <summary>See what will be sent</summary>
+              <textarea class="form-copy" id="q-copy" rows="9" readonly aria-label="Your quote request"></textarea>
+            </details>
           </div>
         </form>
       </div>
@@ -472,17 +467,19 @@
 
   <footer class="site-footer">
     <div class="container footer-inner">
-      <img class="footer-logo" src="logo-web.png" width="360" height="171" alt="Swift Mobile Auto Care" loading="lazy">
-      <p><strong>Swift Mobile Auto Care LLC</strong> · Mobile oil change service · Staten Island, NY · <a href="index.html">Home</a> · <a href="about.html">About us</a></p>
-      <div class="footer-end">
+      <div class="footer-top">
+        <img class="footer-logo" src="logo-web.png" width="360" height="171" alt="Swift Mobile Auto Care" loading="lazy">
+        <p><strong>Swift Mobile Auto Care LLC</strong> · Mobile oil change service · Staten Island, NY · <a href="index.html">Home</a> · <a href="about.html">About us</a></p>
         <div class="footer-social">
           <a href="https://www.instagram.com/swiftmobileautocare/" target="_blank" rel="noopener" aria-label="Instagram"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><path d="M17.5 6.5h.01"/></svg></a>
           <a href="https://www.tiktok.com/@swiftmobileautocare" target="_blank" rel="noopener" aria-label="TikTok"><svg class="icon icon-fill" aria-hidden="true" viewBox="0 0 24 24"><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
           <a href="https://www.facebook.com/swiftmobileautocare" target="_blank" rel="noopener" aria-label="Facebook"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a>
           <a href="https://wa.me/13474796149" target="_blank" rel="noopener" aria-label="WhatsApp"><svg class="icon icon-fill" aria-hidden="true" viewBox="0 0 24 24"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.46-2.39-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.07c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.7.63.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.27-.2-.57-.35m-5.42 7.4h-.01a9.87 9.87 0 0 1-5.03-1.38l-.36-.21-3.74.98 1-3.65-.24-.37a9.86 9.86 0 0 1-1.51-5.26c0-5.45 4.44-9.88 9.89-9.88 2.64 0 5.12 1.03 6.99 2.9a9.83 9.83 0 0 1 2.89 6.99c0 5.45-4.44 9.88-9.89 9.88m8.41-18.3A11.82 11.82 0 0 0 12.05 0C5.5 0 .16 5.34.16 11.89c0 2.1.55 4.14 1.59 5.95L.06 24l6.3-1.65a11.88 11.88 0 0 0 5.68 1.45h.01c6.55 0 11.89-5.34 11.89-11.89a11.82 11.82 0 0 0-3.48-8.41Z"/></svg></a>
         </div>
+      </div>
+      <div class="footer-bottom">
         <p>&copy; <span id="year">2026</span> Swift Mobile Auto Care LLC. All rights reserved.</p>
-        <p class="footer-credit">Made by <a href="https://www.evrionllc.com" target="_blank" rel="noopener">Evrion LLC</a></p>
+        <p class="footer-credit">Made by <a href="https://www.evrionllc.com" target="_blank" rel="noopener">Evrion</a></p>
       </div>
     </div>
   </footer>

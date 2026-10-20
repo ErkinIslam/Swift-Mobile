@@ -5,12 +5,13 @@ Runs on Vercel as a Python function at /api/request. The forms post JSON:
  "key", "channel"}
 and this sends it as an email through the Google Workspace account below.
 "key" identifies one request so a retry isn't emailed twice; "channel": "sms" marks a
-copy of a request the customer is also texting from their phone (see script.js).
+copy of a request the customer was asked to text us (see script.js): requests arrive as
+texts from the customer's own number, and this email is the backup.
 
 Settings (Vercel > Project > Settings > Environment Variables):
   SMTP_USER  the Google Workspace address that sends the email
   SMTP_PASS  an app password for that address (not its normal password)
-  NOTIFY_TO  optional: where requests go (defaults to SMTP_USER)
+  NOTIFY_TO  optional: where requests go (defaults to DEFAULT_NOTIFY_TO below)
 
 Logs are one JSON object per line ({"event": ...}) with no customer details, so a log
 drain or alert can match on "email_failed" (see README.md).
@@ -31,6 +32,7 @@ from http.server import BaseHTTPRequestHandler
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
+DEFAULT_NOTIFY_TO = "oilchange@swiftmobileautocare.com"
 MAX_BYTES = 20_000  # a full request is about 1 KB
 MAX_LINES = 30
 MAX_LINE = 2_000
@@ -105,7 +107,7 @@ def build_email(req, sender, to):
     who = f'{req["company"]} ({req["name"]})' if req["company"] else req["name"]
     tel = "+1" + phone_digits(req["phone"])
     first = html.escape(req["name"].split()[0][:20])
-    texting_note = ("They were sent to their messaging app to text this to you too. "
+    texting_note = ("They were asked to text this to you from their phone. "
                     "If no text arrives, follow up with them.") if req["texting"] else ""
 
     msg = EmailMessage()
@@ -234,7 +236,7 @@ class handler(BaseHTTPRequestHandler):
             log("email_failed", error="SMTP_USER or SMTP_PASS is not set")
             return self.reply(503)
         try:
-            send(build_email(req, user, os.environ.get("NOTIFY_TO") or user), user, password)
+            send(build_email(req, user, os.environ.get("NOTIFY_TO") or DEFAULT_NOTIFY_TO), user, password)
         except (smtplib.SMTPException, OSError) as err:
             # Log the kind of failure only: the request holds customer details
             log("email_failed", error=type(err).__name__, code=getattr(err, "smtp_code", None))

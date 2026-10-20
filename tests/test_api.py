@@ -185,6 +185,15 @@ class HandlerTests(unittest.TestCase):
         status, hdrs, data = self.server.request("POST", "/api/request", body, h)
         return status, hdrs, data
 
+    def test_goes_to_the_business_inbox_unless_overridden(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("NOTIFY_TO", None)
+            self.post(GOOD)
+        self.assertEqual(self.sent[-1]["To"], "oilchange@swiftmobileautocare.com")
+        with mock.patch.dict(os.environ, {"NOTIFY_TO": "other@example.com"}):
+            self.post({**GOOD, "key": "another-key-456"})
+        self.assertEqual(self.sent[-1]["To"], "other@example.com")
+
     def test_valid_request_sends_once(self):
         status, hdrs, body = self.post(GOOD)
         self.assertEqual((status, json.loads(body)), (200, {"ok": True}))
