@@ -1,0 +1,11 @@
+{
+  "extends": ["html-validate:recommended"],
+  "rules": {
+    "doctype-style": "off",
+    "tel-non-breaking": "off",
+    "form-dup-name": ["error", { "shared": ["checkbox", "radio"] }],
+    "no-inline-style": "error",
+    "prefer-native-element": "off",
+    "aria-label-misuse": ["error", { "allowAnyNamable": true }]
+  }
+}

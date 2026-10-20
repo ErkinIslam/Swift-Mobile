@@ -5,6 +5,23 @@
    from the vehicle wrap (red.png) · Lexend / Source Sans 3
    ========================================================================== */
 
+/* Fonts: self-hosted latin subsets (variable weight), see fonts/OFL-*.txt.
+   Covers every character the pages use, including – … and · */
+@font-face {
+  font-family: "Lexend";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/lexend-latin-v26.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("fonts/source-sans-3-latin-v20.woff2") format("woff2");
+}
+
 :root {
   /* Color tokens (matched to the black & white logo) */
   --color-primary: #000000;
@@ -711,8 +728,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   padding: var(--space-4);
 }
 .icon-check { color: var(--color-fg); margin-top: 3px; }
-.assurance dt { font-weight: 700; }
-.assurance dd { margin: 2px 0 0; color: var(--color-fg-muted); }
+.assurance-title { font-weight: 700; }
+.assurance-text { margin: 2px 0 0; color: var(--color-fg-muted); }
 .assurance a { color: var(--color-fg); font-weight: 700; text-underline-offset: 3px; }
 
 .book-form {
@@ -923,6 +940,27 @@ input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--co
 .form-success-title { font-weight: 700; }
 .form-success a { color: #14532D; font-weight: 700; }
 
+/* Request could not be sent: recovery options (script.js shows it) */
+.form-failed {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: var(--radius);
+  color: #7F1D1D;
+}
+.form-failed[hidden] { display: none; }
+.form-failed > .icon { color: var(--color-error); width: 24px; height: 24px; }
+.form-failed > div { display: grid; gap: var(--space-3); min-width: 0; flex: 1; }
+.form-failed-title { font-weight: 700; }
+.form-failed a:not(.btn) { color: #7F1D1D; font-weight: 700; white-space: nowrap; }
+.form-failed-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.form-copy-label { font-size: 15px; font-weight: 600; }
+.form-copy { min-height: 0; font-size: 15px; color: var(--color-fg); background: var(--color-surface); resize: none; }
+
+button[type="submit"]:disabled { cursor: default; opacity: .7; }
+
 /* Contact ---------------------------------------------------------------- */
 .contact-grid { display: grid; gap: var(--space-4); max-width: 900px; margin: 0 auto; }
 .contact-card {
@@ -1077,6 +1115,14 @@ a.contact-card:hover { border-color: var(--color-brand); box-shadow: var(--shado
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
   .reveal { opacity: 1; transform: none; }
+}
+
+/* Print: show everything (unscrolled blocks would otherwise stay invisible), drop screen-only chrome */
+@media print {
+  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .action-bar, .menu-toggle, .mobile-menu, .skip-link, .lightbox { display: none !important; }
+  body { padding-bottom: 0; }
+  .site-header { position: static; }
 }
 
 /* Breakpoints ------------------------------------------------------------ */

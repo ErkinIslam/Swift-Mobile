@@ -1,0 +1,9 @@
+# Everything here is for developing and testing the site, not for visitors:
+# keep it off the public deployment (Vercel serves every other file in this folder)
+README.md
+tests/
+scripts/
+.github/
+.htmlvalidate.json
+.gitignore
+__pycache__/

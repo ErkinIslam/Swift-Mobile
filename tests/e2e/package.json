@@ -1,0 +1,14 @@
+{
+  "name": "swift-mobile-e2e",
+  "private": true,
+  "description": "Browser tests for the Swift Mobile website (not part of the deployed site)",
+  "scripts": {
+    "test": "playwright test",
+    "install-browsers": "playwright install --with-deps chromium webkit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.1",
+    "@playwright/test": "1.49.1",
+    "html-validate": "8.18.2"
+  }
+}

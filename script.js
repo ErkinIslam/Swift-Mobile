@@ -1,26 +1,16 @@
 /* Swift Mobile Auto Care: site behavior (shared by index.html, fleet.html and about.html) */
 
-// ---- Business settings: edit these in one place -------------------------
+// The business number for texted requests. The pages' call/text/WhatsApp links are plain HTML;
+// tests/test_site.py fails if any of them (or this) stops matching.
 const BUSINESS = {
-  phoneDisplay: "(347) 479-6149", // shown on the page
-  phoneE164: "+13474796149",      // used for tap-to-call / text links
+  phoneE164: "+13474796149",
 };
 
 (function () {
   "use strict";
 
-  // Phone number everywhere
-  document.querySelectorAll("[data-phone-text]").forEach((el) => {
-    el.textContent = BUSINESS.phoneDisplay;
-  });
-  document.querySelectorAll("[data-phone-link]").forEach((el) => {
-    el.href = "tel:" + BUSINESS.phoneE164;
-  });
-  document.querySelectorAll("[data-sms-link]").forEach((el) => {
-    el.href = "sms:" + BUSINESS.phoneE164;
-  });
-
-  document.getElementById("year").textContent = new Date().getFullYear();
+  const year = document.getElementById("year");
+  if (year) year.textContent = new Date().getFullYear();
 
   // ---- Mobile menu ------------------------------------------------------
   const menuToggle = document.querySelector(".menu-toggle");
@@ -34,7 +24,8 @@ const BUSINESS = {
     menuToggle.addEventListener("click", () => {
       const open = mobileMenu.hidden;
       setMenu(open);
-      if (open) mobileMenu.querySelector("a").focus();
+      const first = mobileMenu.querySelector("a");
+      if (open && first) first.focus();
     });
     mobileMenu.addEventListener("click", (e) => {
       if (e.target.closest("a")) setMenu(false);
@@ -59,8 +50,9 @@ const BUSINESS = {
     return "sms:" + BUSINESS.phoneE164 + sep + "body=" + encodeURIComponent(body);
   }
 
-  // Posts a request to api/request.py, which emails it to us. True if it was sent
-  async function sendRequest(payload) {
+  // Posts a request to api/request.py, which emails it to us. True if it was sent.
+  // keepalive lets the request finish while the phone switches to its messaging app.
+  async function sendRequest(payload, keepalive) {
     if (location.protocol === "file:") return false; // page opened from disk: no server
     const timeout = new AbortController();
     const timer = setTimeout(() => timeout.abort(), 20000);
@@ -70,6 +62,7 @@ const BUSINESS = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         signal: timeout.signal,
+        keepalive: Boolean(keepalive),
       });
       return res.ok;
     } catch (err) {
@@ -79,20 +72,68 @@ const BUSINESS = {
     }
   }
 
-  // Phones text requests from their messaging app; computers and tablets (which
-  // usually can't text) email them to us instead
+  // Identifies one request, so sending it again (a retry, a double tap) doesn't email us twice
+  const newKey = () => (window.crypto && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2));
+
+  // Phones text requests from their messaging app (and we get a copy by email, so a request
+  // still reaches us if they never hit send); computers and tablets email them to us
   const isPhone = /Android.+Mobile|iPhone|iPod/.test(navigator.userAgent);
 
-  // Validates fields by id (errors live in #<id>-err), then sends the message built
-  // by buildLines(): texted to the business number on phones, emailed on other
-  // devices (texted after all if the email fails).
+  // Validates fields by id (errors live in #<id>-err), then sends the message built by
+  // buildLines(). If it can't be sent, the .form-failed panel offers retry, copy and text.
   function setupRequestForm(form, kind, rules, buildLines) {
-    const sent = form.querySelector(".form-sent");
-    const texting = form.querySelector(".form-sms");
-    const smsFallback = form.querySelector(".sms-fallback");
+    const panels = {
+      sent: form.querySelector(".form-sent"),
+      sms: form.querySelector(".form-sms"),
+      failed: form.querySelector(".form-failed"),
+    };
+    const showPanel = (name) => {
+      Object.entries(panels).forEach(([key, el]) => { if (el) el.hidden = key !== name; });
+    };
     const submit = form.querySelector('[type="submit"]');
+    const submitLabel = submit.textContent;
     const note = form.querySelector(".form-note");
-    if (!isPhone) note.textContent = note.dataset.emailNote;
+    if (!isPhone && note) note.textContent = note.dataset.emailNote;
+
+    const copyBox = form.querySelector(".form-copy");
+    const copyBtn = form.querySelector(".form-copy-btn");
+    const retryBtn = form.querySelector(".form-retry");
+    if (retryBtn) {
+      retryBtn.addEventListener("click", () => {
+        if (form.requestSubmit) form.requestSubmit(); else submit.click();
+      });
+    }
+    if (copyBtn && copyBox) {
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(copyBox.value);
+          copyBtn.textContent = "Copied";
+          setTimeout(() => { copyBtn.textContent = "Copy request"; }, 2500);
+        } catch (err) {
+          // No clipboard access: select the text so it can be copied by hand
+          copyBox.focus();
+          copyBox.select();
+        }
+      });
+    }
+
+    let key = newKey();
+    let sentKey = null; // key of the request that reached us
+    let sending = false;
+
+    // Changing anything after a successful send makes it a new request
+    const onEdit = (e) => {
+      if (sentKey !== key || e.target.name === "website" || e.target.classList.contains("form-copy")) return;
+      key = newKey();
+      if (!isPhone) {
+        submit.disabled = false;
+        submit.textContent = "Send updated request";
+      }
+    };
+    form.addEventListener("input", onEdit);
+    form.addEventListener("change", onEdit);
 
     function validateField(id) {
       const input = document.getElementById(id);
@@ -118,7 +159,7 @@ const BUSINESS = {
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (submit.disabled) return; // already sending
+      if (sending) return;
 
       const results = Object.keys(rules).map(validateField);
       if (results.includes(false)) {
@@ -131,35 +172,47 @@ const BUSINESS = {
       const lines = buildLines(data);
       const notes = (data.get("notes") || "").trim();
       if (notes) lines.push("Notes: " + notes);
+      const text = lines.join("\n");
+      const href = buildSmsHref(text);
+      form.querySelectorAll(".sms-fallback").forEach((a) => { a.href = href; });
+      if (copyBox) copyBox.value = text;
 
-      if (!isPhone) {
-        const label = submit.textContent;
-        submit.disabled = true;
-        submit.textContent = "Sending…";
-        const ok = await sendRequest({
-          form: kind,
-          name: data.get("name"),
-          phone: data.get("phone"),
-          company: data.get("company") || "",
-          website: data.get("website") || "", // hidden field only bots fill in
-          lines: lines.slice(1), // the first line is the title, only needed in a text
-        });
-        submit.disabled = false;
-        submit.textContent = label;
-        if (ok) {
-          texting.hidden = true;
-          sent.hidden = false;
-          sent.focus();
-          return;
-        }
+      const payload = {
+        form: kind,
+        key: key,
+        name: data.get("name"),
+        phone: data.get("phone"),
+        company: data.get("company") || "",
+        website: data.get("website") || "", // hidden field only bots fill in
+        lines: lines.slice(1), // the first line is the title, only needed in a text
+      };
+
+      if (isPhone) {
+        // Not awaited: the messaging app has to open from this tap
+        sendRequest(Object.assign({ channel: "sms" }, payload), true);
+        sentKey = key;
+        showPanel("sms");
+        panels.sms.focus();
+        window.location.href = href;
+        return;
       }
 
-      const href = buildSmsHref(lines.join("\n"));
-      smsFallback.href = href;
-      sent.hidden = true;
-      texting.hidden = false;
-      texting.focus();
-      window.location.href = href;
+      sending = true;
+      submit.disabled = true;
+      submit.textContent = "Sending…";
+      const ok = await sendRequest(payload);
+      sending = false;
+      if (ok) {
+        sentKey = key;
+        submit.textContent = "Request sent";
+        showPanel("sent");
+        panels.sent.focus();
+        return;
+      }
+      submit.disabled = false;
+      submit.textContent = submitLabel;
+      showPanel("failed");
+      if (retryBtn) retryBtn.focus();
     });
 
     return validateField;
@@ -176,13 +229,31 @@ const BUSINESS = {
       });
     });
 
-    // Date: earliest is today
+    // Date and time: no past days, and no time slots that have already started today.
+    // Once the last slot has started, the earliest day is tomorrow.
     const dateInput = document.getElementById("f-date");
+    const timeSelect = document.getElementById("f-time");
+    const slots = Array.from(timeSelect.options).filter((o) => o.dataset.start);
+    const lastStart = Math.max(...slots.map((o) => Number(o.dataset.start)));
     const toISO = (d) => {
       const off = d.getTimezoneOffset();
       return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
     };
-    dateInput.min = toISO(new Date());
+    // Rerun before validating too, in case the page was left open for hours
+    const refreshDateLimits = () => {
+      const now = new Date();
+      const today = toISO(now);
+      const earliest = new Date(now);
+      if (now.getHours() >= lastStart) earliest.setDate(earliest.getDate() + 1);
+      dateInput.min = toISO(earliest);
+      slots.forEach((o) => {
+        o.disabled = dateInput.value === today && Number(o.dataset.start) <= now.getHours();
+      });
+      if (timeSelect.selectedOptions[0] && timeSelect.selectedOptions[0].disabled) timeSelect.value = "No preference";
+    };
+    refreshDateLimits();
+    dateInput.addEventListener("change", refreshDateLimits);
+    dateInput.addEventListener("focus", refreshDateLimits);
 
     // Live price estimate (prices come from data-price in the form)
     const serviceBoxes = form.querySelectorAll('input[name="service"]');
@@ -255,6 +326,7 @@ const BUSINESS = {
       "f-address": (v) => v.trim().length >= 5,
       "f-spot": (v) => v !== "",
       "f-date": (v) => {
+        refreshDateLimits();
         if (!v) return false;
         const d = new Date(v + "T12:00:00");
         return v >= dateInput.min && d.getDay() !== 0; // closed Sundays
