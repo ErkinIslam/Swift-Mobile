@@ -189,12 +189,14 @@ def record_sent(key, now=None):
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
-            self.handle_request()
+            self.process_request()
         except Exception as err:  # never leak a traceback; the form shows its own recovery options
             log("unexpected_error", error=type(err).__name__)
             self.reply(500)
 
-    def handle_request(self):
+    # Not "handle_request": Vercel's runtime subclasses this handler and uses that name to call
+    # do_POST, so overriding it made every POST call itself until it hit the recursion limit.
+    def process_request(self):
         if not self.headers.get("Content-Type", "").split(";")[0].strip() == "application/json":
             return self.reply(415)
         try:

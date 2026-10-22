@@ -280,6 +280,18 @@ class HandlerTests(unittest.TestCase):
         # No CORS preflight support: browsers can't post JSON here from other sites
         self.assertEqual(self.server.request("OPTIONS", "/api/request")[0], 501)
 
+    def test_works_inside_vercels_wrapper(self):
+        # Vercel's Python runtime subclasses `handler` and dispatches through its own
+        # handle_request(); a method of ours with that name made every POST a 500 in production.
+        class VercelHandler(api.handler):
+            def handle_request(self):
+                getattr(self, "do_" + self.command)()
+
+        self.server.close()
+        self.server = Server(VercelHandler)
+        self.assertEqual(self.post(GOOD)[0], 200)
+        self.assertEqual(len(self.sent), 1)
+
 
 class HealthTests(unittest.TestCase):
     TOKEN = "t0ken-for-tests-1234567890"
