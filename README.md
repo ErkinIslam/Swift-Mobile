@@ -30,6 +30,10 @@ Requests arrive as **texts from the customer's own number**, so you can answer t
   "Text [name]" button.
 - Each request has a key, so showing the code again, a double click or a retry doesn't send a second email.
   Changing the form makes it a new request (and a new email).
+- **Remember my details:** if the customer ticks it, sending the form saves the fields marked `data-remember` in
+  their browser (`localStorage`, nothing extra reaches the server), and both forms fill them back in next visit with
+  a "Not you? Clear them" link. Name and phone are shared between the two forms; services, date and notes are never
+  saved. Unticking it and sending forgets what was saved.
 
 The QR code uses the standard `SMSTO:` format, which iPhone and most Android cameras open directly (a few older
 Android phones need Google Lens). It's drawn in the browser by `vendor/qrcode-generator-1.4.4.js` (MIT licence,

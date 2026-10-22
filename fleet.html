@@ -289,28 +289,30 @@
         </div>
 
         <form class="book-form" id="fleet-form" novalidate>
+          <p class="form-welcome" hidden>Welcome back! We filled in your details from last time. <button type="button" class="link-button">Not you? Clear them</button></p>
+
           <div class="field">
             <label for="q-company">Company name</label>
-            <input id="q-company" name="company" type="text" autocomplete="organization" maxlength="100" required>
+            <input id="q-company" name="company" data-remember type="text" autocomplete="organization" maxlength="100" required>
             <p class="field-error" id="q-company-err" hidden>Please enter your company name.</p>
           </div>
 
           <div class="row-2">
             <div class="field">
               <label for="q-name">Your name</label>
-              <input id="q-name" name="name" type="text" autocomplete="name" maxlength="100" required>
+              <input id="q-name" name="name" data-remember="shared" type="text" autocomplete="name" maxlength="100" required>
               <p class="field-error" id="q-name-err" hidden>Please enter your name.</p>
             </div>
             <div class="field">
               <label for="q-phone">Phone number</label>
-              <input id="q-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" placeholder="(718) 555-1234" required>
+              <input id="q-phone" name="phone" data-remember="shared" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" placeholder="(718) 555-1234" required>
               <p class="field-error" id="q-phone-err" hidden>Please enter a 10-digit phone number.</p>
             </div>
           </div>
 
           <div class="field">
             <label for="q-count">Number of vehicles</label>
-            <select id="q-count" name="count">
+            <select id="q-count" name="count" data-remember>
               <option>2–5</option>
               <option>6–10</option>
               <option>11–25</option>
@@ -320,7 +322,7 @@
 
           <div class="field">
             <label for="q-types">Vehicle types <span class="optional">(optional)</span></label>
-            <input id="q-types" name="types" type="text" maxlength="200" placeholder="e.g. 4 Ford Transit vans, 2 pickups">
+            <input id="q-types" name="types" data-remember type="text" maxlength="200" placeholder="e.g. 4 Ford Transit vans, 2 pickups">
           </div>
 
           <div class="field">
@@ -336,7 +338,7 @@
 
           <div class="field">
             <label for="q-invoice">Invoicing</label>
-            <select id="q-invoice" name="invoice">
+            <select id="q-invoice" name="invoice" data-remember>
               <option>One invoice per visit</option>
               <option>One invoice per month</option>
               <option selected>Not sure yet</option>
@@ -346,7 +348,7 @@
           <div class="field">
             <label for="q-address">Where are the vehicles parked?</label>
             <!-- [html-validate-disable-next valid-autocomplete -- street-address puts the whole address in this one-line field, which is what we want] -->
-            <input id="q-address" name="address" type="text" autocomplete="street-address" maxlength="200" placeholder="Street, city or borough, ZIP" required>
+            <input id="q-address" name="address" data-remember type="text" autocomplete="street-address" maxlength="200" placeholder="Street, city or borough, ZIP" required>
             <p class="field-error" id="q-address-err" hidden>Please enter where the vehicles are parked.</p>
           </div>
 
@@ -358,6 +360,12 @@
           <div class="form-hp" aria-hidden="true">
             <label for="q-website">Leave this field empty</label>
             <input id="q-website" name="website" type="text" tabindex="-1" autocomplete="off">
+          </div>
+
+          <!-- Shown by script.js: saves the company, contact and fleet fields in this browser only -->
+          <div class="form-remember" hidden>
+            <label class="form-remember-label"><input type="checkbox" id="q-remember"> Remember my details on this device</label>
+            <p class="field-hint">Kept only in this browser, so next time the form fills itself in. Schedule and notes aren't saved.</p>
           </div>
 
           <button type="submit" class="btn btn-accent btn-lg btn-block">Send quote request</button>

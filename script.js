@@ -77,6 +77,28 @@ const BUSINESS = {
     ? crypto.randomUUID()
     : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
+  // "Remember my details": sending a form with it ticked saves the fields marked data-remember in
+  // this browser only (nothing extra reaches us), and the forms fill them back in next visit.
+  // data-remember="shared" fields (name, phone) fill in on both forms; the rest only on their own.
+  const DETAILS_KEY = "swift-mobile-details";
+  const loadDetails = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(DETAILS_KEY));
+      return saved && typeof saved === "object" ? saved : {};
+    } catch (err) {
+      return {}; // storage blocked (private browsing, site data off) or unreadable
+    }
+  };
+  // null forgets everything saved
+  const saveDetails = (saved) => {
+    try {
+      if (saved) localStorage.setItem(DETAILS_KEY, JSON.stringify(saved));
+      else localStorage.removeItem(DETAILS_KEY);
+    } catch (err) {
+      // storage blocked: nothing is remembered, the form still works
+    }
+  };
+
   // Requests reach us as a text from the customer's own number, so we can reply in the same thread.
   // Phones open their messaging app; computers and tablets show a QR code that opens it on their
   // phone. Either way we also get a copy by email, in case the text is never sent.
@@ -156,11 +178,63 @@ const BUSINESS = {
     let key = newKey();
     let emailedKey = null; // key whose email copy has been sent or is on its way
     const onEdit = (e) => {
-      if (e.target.name === "website" || e.target.classList.contains("form-copy")) return;
+      if (e.target.name === "website" || e.target.classList.contains("form-copy") || e.target.closest(".form-remember")) return;
       key = newKey();
     };
     form.addEventListener("input", onEdit);
     form.addEventListener("change", onEdit);
+
+    // Remembered details (see loadDetails). The checkbox is hidden without JS, where it can't work.
+    const remembered = Array.from(form.querySelectorAll("[data-remember]"));
+    const scopeOf = (el) => (el.dataset.remember === "shared" ? "shared" : kind);
+    const rememberRow = form.querySelector(".form-remember");
+    const rememberBox = rememberRow && rememberRow.querySelector("input");
+    const welcome = form.querySelector(".form-welcome");
+    if (rememberBox && welcome) {
+      rememberRow.hidden = false;
+      const saved = loadDetails();
+      let filled = false;
+      remembered.forEach((el) => {
+        const v = (saved[scopeOf(el)] || {})[el.name];
+        if (typeof v !== "string" || !v) return;
+        if (el.tagName === "SELECT" && !Array.from(el.options).some((o) => o.value === v && !o.disabled)) return;
+        el.value = v;
+        filled = true;
+      });
+      if (filled) {
+        rememberBox.checked = true;
+        welcome.hidden = false;
+      }
+
+      // "Not you?": forget them here and on the other form, and empty the fields
+      welcome.querySelector("button").addEventListener("click", () => {
+        saveDetails(null);
+        remembered.forEach((el) => {
+          if (el.tagName === "SELECT") Array.from(el.options).forEach((o) => { o.selected = o.defaultSelected; });
+          else el.value = "";
+        });
+        rememberBox.checked = false;
+        welcome.hidden = true;
+        key = newKey();
+        remembered[0].focus();
+      });
+    }
+
+    // Called once the form is valid: ticked saves the details, unticked forgets any saved before
+    function storeDetails() {
+      if (!rememberBox) return;
+      if (!rememberBox.checked) {
+        saveDetails(null);
+        return;
+      }
+      const saved = loadDetails();
+      remembered.forEach((el) => {
+        const scope = scopeOf(el);
+        if (!saved[scope] || typeof saved[scope] !== "object") saved[scope] = {};
+        saved[scope][el.name] = el.value.trim();
+      });
+      saveDetails(saved);
+    }
 
     // Emails us a copy. Resolves to true/false, or null if this request was already sent
     function emailCopy(payload, keepalive) {
@@ -203,6 +277,7 @@ const BUSINESS = {
         if (firstBad) firstBad.focus();
         return;
       }
+      storeDetails();
 
       const data = new FormData(form);
       const lines = buildLines(data);

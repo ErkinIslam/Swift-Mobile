@@ -314,6 +314,54 @@ test.describe("form rules (every device)", () => {
     await expect(page.locator("#f-date")).toHaveAttribute("min", "2026-10-21");
   });
 
+  test("remember my details: filled in next visit, on both forms, until cleared", async ({ page }) => {
+    await page.goto("/#book");
+    await expect(page.locator("#booking-form .form-welcome")).toBeHidden();
+    await expect(page.locator("#f-remember")).not.toBeChecked();
+    await fillBooking(page);
+    await page.check("#f-remember");
+    await page.click('#booking-form [type="submit"]');
+    await expect(page.locator("#booking-form .form-sms:visible, #booking-form .form-qr:visible")).toBeVisible();
+
+    await page.goto("about:blank"); // a fresh visit, not a jump within the page or a reload
+    await page.goto("/#book");
+    await expect(page.locator("#booking-form .form-welcome")).toBeVisible();
+    await expect(page.locator("#f-remember")).toBeChecked();
+    for (const [sel, v] of [["#f-name", "Jane Doe"], ["#f-phone", "(718) 555-1234"], ["#f-year", "2019"],
+      ["#f-make", "Honda"], ["#f-model", "CR-V"], ["#f-address", "12 Main St, 10301"], ["#f-spot", "Driveway"]]) {
+      await expect(page.locator(sel), sel).toHaveValue(v);
+    }
+    await expect(page.locator("#f-date")).toHaveValue(""); // a new booking needs a new day
+    await expect(page.locator("#f-notes")).toHaveValue("");
+
+    // Name and phone carry over to the fleet form; the booking's address doesn't
+    await page.goto("/fleet.html#quote");
+    await expect(page.locator("#q-name")).toHaveValue("Jane Doe");
+    await expect(page.locator("#q-phone")).toHaveValue("(718) 555-1234");
+    await expect(page.locator("#q-address")).toHaveValue("");
+
+    await page.goto("/#book");
+    await page.click("#booking-form .form-welcome button");
+    await expect(page.locator("#booking-form .form-welcome")).toBeHidden();
+    await expect(page.locator("#f-name")).toHaveValue("");
+    await expect(page.locator("#f-name")).toBeFocused();
+    await expect(page.locator("#f-spot")).toHaveValue("");
+    await expect(page.locator("#f-remember")).not.toBeChecked();
+    expect(await page.evaluate(() => localStorage.getItem("swift-mobile-details"))).toBeNull();
+  });
+
+  test("remember my details left unticked: nothing is saved", async ({ page }) => {
+    await page.goto("/#book");
+    await fillBooking(page);
+    await page.click('#booking-form [type="submit"]');
+    await expect(page.locator("#booking-form .form-sms:visible, #booking-form .form-qr:visible")).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("swift-mobile-details"))).toBeNull();
+    await page.goto("about:blank");
+    await page.goto("/#book");
+    await expect(page.locator("#f-name")).toHaveValue("");
+    await expect(page.locator("#booking-form .form-welcome")).toBeHidden();
+  });
+
   test("text fields are capped to what the server keeps", async ({ page }) => {
     await page.goto("/#book");
     await page.fill("#f-notes", "x".repeat(1500));

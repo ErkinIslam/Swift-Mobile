@@ -418,15 +418,17 @@
         </div>
 
         <form class="book-form" id="booking-form" novalidate>
+          <p class="form-welcome" hidden>Welcome back! We filled in your details from last time. <button type="button" class="link-button">Not you? Clear them</button></p>
+
           <div class="field">
             <label for="f-name">Full name</label>
-            <input id="f-name" name="name" type="text" autocomplete="name" maxlength="100" required>
+            <input id="f-name" name="name" data-remember="shared" type="text" autocomplete="name" maxlength="100" required>
             <p class="field-error" id="f-name-err" hidden>Please enter your name.</p>
           </div>
 
           <div class="field">
             <label for="f-phone">Phone number</label>
-            <input id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" placeholder="(718) 555-1234" required>
+            <input id="f-phone" name="phone" data-remember="shared" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" placeholder="(718) 555-1234" required>
             <p class="field-error" id="f-phone-err" hidden>Please enter a 10-digit phone number.</p>
           </div>
 
@@ -484,17 +486,17 @@
             <div class="row-3">
               <div class="field">
                 <label for="f-year">Year</label>
-                <input id="f-year" name="year" type="text" inputmode="numeric" maxlength="4" placeholder="2019" required>
+                <input id="f-year" name="year" data-remember type="text" inputmode="numeric" maxlength="4" placeholder="2019" required>
                 <p class="field-error" id="f-year-err" hidden>Enter a 4-digit year.</p>
               </div>
               <div class="field">
                 <label for="f-make">Make</label>
-                <input id="f-make" name="make" type="text" maxlength="40" placeholder="Honda" required>
+                <input id="f-make" name="make" data-remember type="text" maxlength="40" placeholder="Honda" required>
                 <p class="field-error" id="f-make-err" hidden>Enter the make.</p>
               </div>
               <div class="field">
                 <label for="f-model">Model</label>
-                <input id="f-model" name="model" type="text" maxlength="40" placeholder="CR-V" required>
+                <input id="f-model" name="model" data-remember type="text" maxlength="40" placeholder="CR-V" required>
                 <p class="field-error" id="f-model-err" hidden>Enter the model.</p>
               </div>
             </div>
@@ -503,14 +505,14 @@
           <div class="field">
             <label for="f-address">Service address</label>
             <!-- [html-validate-disable-next valid-autocomplete -- street-address puts the whole address in this one-line field, which is what we want] -->
-            <input id="f-address" name="address" type="text" autocomplete="street-address" maxlength="200" placeholder="Street, neighborhood, ZIP" required>
+            <input id="f-address" name="address" data-remember type="text" autocomplete="street-address" maxlength="200" placeholder="Street, neighborhood, ZIP" required>
             <p class="field-hint">Home, work, or wherever the car will be.</p>
             <p class="field-error" id="f-address-err" hidden>Please enter the address where the car will be.</p>
           </div>
 
           <div class="field">
             <label for="f-spot">Where exactly is the car parked?</label>
-            <select id="f-spot" name="spot" required>
+            <select id="f-spot" name="spot" data-remember required>
               <option value="" selected disabled>Choose one</option>
               <option>Driveway</option>
               <option>Garage</option>
@@ -548,6 +550,12 @@
           <div class="form-hp" aria-hidden="true">
             <label for="f-website">Leave this field empty</label>
             <input id="f-website" name="website" type="text" tabindex="-1" autocomplete="off">
+          </div>
+
+          <!-- Shown by script.js: saves the contact, car and address fields in this browser only -->
+          <div class="form-remember" hidden>
+            <label class="form-remember-label"><input type="checkbox" id="f-remember"> Remember my details on this device</label>
+            <p class="field-hint">Kept only in this browser, so next time the form fills itself in. Services, date and notes aren't saved.</p>
           </div>
 
           <button type="submit" class="btn btn-accent btn-lg btn-block">Send booking request</button>

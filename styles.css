@@ -924,6 +924,24 @@ input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--co
 .review-band .eyebrow { color: var(--color-brand); margin: 0 0 var(--space-2); }
 
 .form-note { font-size: 15px; color: var(--color-fg-muted); text-align: center; }
+/* "Remember my details" (saved in this browser by script.js) and the welcome-back line it fills in */
+.form-welcome { padding: var(--space-3) 14px; background: var(--color-muted); border-radius: var(--radius-sm); font-size: 15px; }
+.form-remember { display: grid; gap: 4px; }
+.form-welcome[hidden], .form-remember[hidden] { display: none; }
+.form-remember-label { display: flex; align-items: center; gap: var(--space-3); font-weight: 600; cursor: pointer; }
+.form-remember input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  -webkit-appearance: auto;
+  appearance: auto;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+.form-remember .field-hint { padding-left: 32px; }
 /* Spam trap: hidden from people and screen readers, so only bots fill it in */
 .form-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .form-success {
