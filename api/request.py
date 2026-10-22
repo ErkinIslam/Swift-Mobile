@@ -1,12 +1,10 @@
 """Emails booking and fleet quote requests from the website to the business inbox.
 
-Runs on Vercel as a Python function at /api/request. The forms post JSON:
-{"form": "booking" | "fleet", "name", "phone", "company", "lines", "website",
- "key", "channel"}
+Runs on Vercel as a Python function at /api/request. Only computers and tablets use it
+(phones text their requests instead, see script.js). The forms post JSON:
+{"form": "booking" | "fleet", "name", "phone", "company", "lines", "website", "key"}
 and this sends it as an email through the Google Workspace account below.
-"key" identifies one request so a retry isn't emailed twice; "channel": "sms" marks a
-copy of a request the customer was asked to text us (see script.js): requests arrive as
-texts from the customer's own number, and this email is the backup.
+"key" identifies one request so a retry isn't emailed twice.
 
 Settings (Vercel > Project > Settings > Environment Variables):
   SMTP_USER  the Google Workspace address that sends the email
@@ -99,7 +97,7 @@ def parse(data):
     if not (isinstance(key, str) and re.fullmatch(r"[A-Za-z0-9-]{8,64}", key)):
         key = None
     return {"kind": kind, "name": name, "phone": phone, "company": company, "lines": lines,
-            "key": key, "texting": data.get("channel") == "sms"}
+            "key": key}
 
 
 def build_email(req, sender, to):
@@ -107,14 +105,12 @@ def build_email(req, sender, to):
     who = f'{req["company"]} ({req["name"]})' if req["company"] else req["name"]
     tel = "+1" + phone_digits(req["phone"])
     first = html.escape(req["name"].split()[0][:20])
-    texting_note = ("They were asked to text this to you from their phone. "
-                    "If no text arrives, follow up with them.") if req["texting"] else ""
 
     msg = EmailMessage()
-    msg["Subject"] = f"{title}{' (texting you)' if req['texting'] else ''}: {who}"
+    msg["Subject"] = f"{title}: {who}"
     msg["From"] = formataddr(("Swift Mobile website", sender))
     msg["To"] = to
-    msg.set_content("\n".join([title, ""] + ([texting_note, ""] if texting_note else []) + req["lines"]) + "\n")
+    msg.set_content("\n".join([title, ""] + req["lines"]) + "\n")
 
     rows = []
     for line in req["lines"]:
@@ -129,11 +125,9 @@ def build_email(req, sender, to):
             + "</td></tr>"
         )
     button = "display:inline-block;margin:0 8px 8px 0;padding:12px 20px;border-radius:8px;background:#0A0A0A;color:#FFFFFF;font-weight:bold;text-decoration:none"
-    note_html = f'<p style="margin:0 0 12px;color:#525252">{html.escape(texting_note)}</p>' if texting_note else ""
     msg.add_alternative(
         '<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.4;color:#0A0A0A;max-width:560px">'
         f'<p style="margin:0 0 12px;font-size:20px;font-weight:bold">{title}</p>'
-        f"{note_html}"
         f'<table style="border-collapse:collapse">{"".join(rows)}</table>'
         f'<p style="margin:20px 0 0"><a href="tel:{tel}" style="{button}">Call {first}</a>'
         f'<a href="sms:{tel}" style="{button}">Text {first}</a></p>'
@@ -244,7 +238,7 @@ class handler(BaseHTTPRequestHandler):
             log("email_failed", error=type(err).__name__, code=getattr(err, "smtp_code", None))
             return self.reply(502)
         record_sent(req["key"])
-        log("email_sent", form=req["kind"], texting=req["texting"])
+        log("email_sent", form=req["kind"])
         self.reply(200)
 
     def do_GET(self):

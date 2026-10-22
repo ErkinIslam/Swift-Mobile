@@ -64,7 +64,6 @@ class ParseTests(unittest.TestCase):
         req = api.parse(GOOD)
         self.assertEqual(req["kind"], "booking")
         self.assertEqual(req["key"], GOOD["key"])
-        self.assertFalse(req["texting"])
         self.assertEqual(req["lines"][2], "Notes: Gate 4\nCall first")
 
     def test_rejects(self):
@@ -122,11 +121,12 @@ class EmailTests(unittest.TestCase):
         self.assertIn('href="tel:+17185551234"', body)
         self.assertIn('href="sms:+17185551234"', body)
 
-    def test_texted_copy_is_labelled(self):
-        req = api.parse({**GOOD, "channel": "sms"})
-        msg = api.build_email(req, "a@b.c", "a@b.c")
-        self.assertIn("(texting you)", msg["Subject"])
-        self.assertIn("If no text arrives", msg.get_body(("plain",)).get_content())
+    def test_booking_subject_names_customer(self):
+        msg = api.build_email(api.parse(GOOD), "a@b.c", "a@b.c")
+        self.assertEqual(msg["Subject"], "Booking request: Jane Doe")
+        # An old page that still sends "channel" gets the same plain email
+        self.assertEqual(api.build_email(api.parse({**GOOD, "channel": "sms"}), "a@b.c", "a@b.c")["Subject"],
+                         "Booking request: Jane Doe")
 
     def test_fleet_subject_names_company(self):
         req = api.parse({**GOOD, "form": "fleet", "company": "Acme Plumbing"})

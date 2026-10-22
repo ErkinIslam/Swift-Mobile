@@ -9,8 +9,6 @@
   "devDependencies": {
     "@axe-core/playwright": "4.10.1",
     "@playwright/test": "1.49.1",
-    "html-validate": "8.18.2",
-    "jsqr": "1.4.0",
-    "pngjs": "7.0.0"
+    "html-validate": "8.18.2"
   }
 }

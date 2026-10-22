@@ -172,13 +172,8 @@ class FormTests(unittest.TestCase):
 
     def test_forms_have_all_result_panels(self):
         for name in ["index.html", "fleet.html"]:
-            for cls in ["form-sms", "form-qr", "form-qr-code", "form-qr-status", "form-copy", "form-copy-btn", "form-hp"]:
+            for cls in ["form-sms", "form-sent", "form-failed", "form-retry", "form-hp"]:
                 self.assertIn(cls, PARSED[name].source, f"{name}: .{cls}")
-
-    def test_qr_library_is_there(self):
-        with open(os.path.join(ROOT, "script.js"), encoding="utf-8") as f:
-            src = re.search(r'lib\.src = "([^"]+)"', f.read()).group(1)
-        self.assertTrue(os.path.exists(os.path.join(ROOT, src)), src)
 
 
 class SharedLayoutTests(unittest.TestCase):

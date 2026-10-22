@@ -369,7 +369,7 @@
           </div>
 
           <button type="submit" class="btn btn-accent btn-lg btn-block">Send quote request</button>
-          <p class="form-note" data-email-note="Next, you'll get a code to scan with your phone, so you can text us your quote request.">Submitting opens your messaging app with your quote request written out, ready to send. We also get a copy by email.</p>
+          <p class="form-note" data-email-note="Your request comes straight to us. We'll get back to you with a quote.">Submitting opens your messaging app with your quote request ready to send to us.</p>
           <p class="form-privacy">Privacy: we only use your details to prepare your quote and contact you about it. We never sell or share them.</p>
 
           <!-- Phones: the messaging app opens with the request written out -->
@@ -381,23 +381,25 @@
             </div>
           </div>
 
-          <!-- Computers: a QR code opens the request as a text on the visitor's phone (script.js draws it) -->
-          <div class="form-qr" role="region" aria-labelledby="q-qr-title" tabindex="-1" hidden>
-            <p class="form-qr-title" id="q-qr-title">Last step: text us your quote request from your phone</p>
-            <div class="form-qr-body">
-              <div class="form-qr-code"></div>
-              <ol class="form-qr-steps">
-                <li>Point your phone's camera at this code.</li>
-                <li>Tap the message prompt that appears. Your quote request opens in your messaging app, already written out.</li>
-                <li>Hit send. We'll text you back with your quote.</li>
-              </ol>
+          <!-- Computers: the request is emailed to us -->
+          <div class="form-success form-sent" role="status" tabindex="-1" hidden>
+            <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
+            <div>
+              <p class="form-success-title">Request received. Thank you!</p>
+              <p>We'll get back to you soon with your quote. Questions? Call <a href="tel:+13474796149">(347) 479-6149</a>.</p>
             </div>
-            <p class="form-qr-status" role="status"></p>
-            <p class="form-qr-alt">Can't scan it? <a class="sms-fallback" href="sms:+13474796149">Text it from this device</a>, <button type="button" class="link-button form-copy-btn">copy it</button>, or call <a href="tel:+13474796149">(347) 479-6149</a>.</p>
-            <details class="form-qr-details">
-              <summary>See what will be sent</summary>
-              <textarea class="form-copy" id="q-copy" rows="9" readonly aria-label="Your quote request"></textarea>
-            </details>
+          </div>
+
+          <!-- Computers: shown if the request couldn't be sent. Nothing typed is lost -->
+          <div class="form-failed" role="alert" hidden>
+            <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            <div>
+              <p class="form-failed-title">We couldn't send your quote request.</p>
+              <p>Nothing you typed is lost. Please try again, or <a href="tel:+13474796149">call</a> or <a href="sms:+13474796149">text</a> us at <span class="no-wrap">(347) 479-6149</span>.</p>
+              <div class="form-failed-actions">
+                <button type="button" class="btn btn-accent btn-sm form-retry">Try again</button>
+              </div>
+            </div>
           </div>
         </form>
       </div>

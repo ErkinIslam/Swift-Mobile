@@ -10,7 +10,6 @@ styles.css  script.js                         shared by every page
 api/request.py                                POST /api/request: emails a form request (Gmail SMTP)
 api/health.py                                 GET  /api/health: checks email still works, for a monitor
 fonts/  img/                                  self-hosted fonts (OFL licensed) and photos
-vendor/                                       QR code library (drawn in the browser, computers only)
 vercel.json                                   security headers and caching
 scripts/dev_server.py                         local server that behaves like Vercel
 tests/                                        Python tests (API, page consistency) and browser tests (tests/e2e)
@@ -18,26 +17,14 @@ tests/                                        Python tests (API, page consistenc
 
 ## How a request reaches the business
 
-Requests arrive as **texts from the customer's own number**, so you can answer them in the same thread:
-
 - **Phones:** after "Send booking request", the messaging app opens with the whole request written out, addressed
-  to (347) 479-6149. The customer only has to hit send.
-- **Computers and tablets:** a QR code appears. Scanning it with the phone's camera opens the same pre-written text
-  on their phone. If they can't scan it, the panel offers to text it from the computer (Mac/iPad Messages), copy it,
-  or call.
-- **Email backup:** every request is also emailed to `oilchange@swiftmobileautocare.com`, with "(texting you)" in the
-  subject. If an email arrives and no text follows, the customer never hit send: reply with the email's
-  "Text [name]" button.
-- Each request has a key, so showing the code again, a double click or a retry doesn't send a second email.
-  Changing the form makes it a new request (and a new email).
-- **Remember my details:** if the customer ticks it, sending the form saves the fields marked `data-remember` in
-  their browser (`localStorage`, nothing extra reaches the server), and both forms fill them back in next visit with
-  a "Not you? Clear them" link. Name and phone are shared between the two forms; services, date and notes are never
-  saved. Unticking it and sending forgets what was saved.
-
-The QR code uses the standard `SMSTO:` format, which iPhone and most Android cameras open directly (a few older
-Android phones need Google Lens). It's drawn in the browser by `vendor/qrcode-generator-1.4.4.js` (MIT licence,
-from npm `qrcode-generator`), which only loads on computers and tablets.
+  to (347) 479-6149. The customer hits send and it arrives as a text from their own number, so you reply in the
+  same thread. Nothing is emailed: if they never hit send, nothing reaches you.
+- **Computers and tablets:** the request is emailed to `oilchange@swiftmobileautocare.com` and the customer sees
+  "Request received". If it can't be sent (no connection, Gmail problem, too many requests), they see "We couldn't
+  send your request" with a Try again button and your number. Nothing they typed is lost.
+- Each emailed request has a key, so a retry or a double click doesn't send a second email. Changing the form
+  after sending makes it a new request ("Send updated request").
 
 ## Run it locally
 
@@ -81,7 +68,7 @@ run `python3 -m unittest discover -s tests`: `tests/test_site.py` fails if any c
 |---|---|---|
 | `SMTP_USER` | yes | Google Workspace address that sends the emails |
 | `SMTP_PASS` | yes | An [app password](https://support.google.com/accounts/answer/185833) for that address |
-| `NOTIFY_TO` | no | Where the email copies go (defaults to `oilchange@swiftmobileautocare.com`) |
+| `NOTIFY_TO` | no | Where computer requests are emailed (defaults to `oilchange@swiftmobileautocare.com`) |
 | `HEALTH_TOKEN` | for monitoring | A long random string (at least 16 characters) that unlocks `/api/health` |
 
 Changing the Google account's password cancels its app passwords. When that happens, the site can't send email
@@ -125,5 +112,5 @@ requests per minute per IP). That's set in the Vercel dashboard (Firewall), depe
       that request fails quietly).
 - [ ] After the first deploy, check that https://swiftmobileautocare.com/README.md and `/tests/test_api.py` are 404
       (`.vercelignore` keeps them off the site).
-- [ ] Send one real booking from a computer (scan the QR code with an iPhone and with an Android phone), one from
-      a phone, and one fleet quote. Confirm the texts arrive and the backup emails reach oilchange@.
+- [ ] Send one real booking from a phone (confirm the text arrives) and one from a computer, plus one fleet quote
+      from a computer (confirm both emails reach oilchange@).
